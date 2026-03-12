@@ -12,13 +12,19 @@ class RoutineTask extends Model
         'parent_id',
         'title',
         'description',
-        'day_of_week',
+        'repeat_days',
         'start_at',
         'end_at',
+        'deactivated_at',
     ];
 
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function subTasks()
+    {
+        return $this->hasMany(RoutineTask::class, 'parent_id');
     }
 }

@@ -2,57 +2,65 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\RoutineTaskResource;
 use App\Models\RoutineTask;
+use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class RoutineTaskController extends Controller
 {
+    use ApiResponse;
+
     // Routine index method
     public function index()
     {
-        // get routine task with user id
+        // get active routine tasks with user id
         $userId = Auth::user()->id;
         $dayOfWeek = request()->query('day_of_week');
         $routineTasks = RoutineTask::where('user_id', $userId)
+            ->whereNull('parent_id')
+            ->whereNull('deactivated_at')
             ->when($dayOfWeek, function ($query) use ($dayOfWeek) {
-                return $query->where('day_of_week', $dayOfWeek);
+                $query->whereJsonContains('repeat_days', $dayOfWeek);
             })
             ->get();
 
-        return response()->json([
-            'routine_tasks' => $routineTasks
-        ], 200);
+        return $this->success(
+            RoutineTaskResource::collection($routineTasks),
+            'Routine tasks retrieved successfully'
+        );
     }
+
 
     // Routine show method
     public function show($id)
     {
-        $routineTask = RoutineTask::findOrFail($id);
+        $routineTask = RoutineTask::with('subTasks')->findOrFail($id);
 
-        return response()->json([
-            'routine_task' => $routineTask
-        ], 200);
+        return $this->success(
+            new RoutineTaskResource($routineTask),
+            'Routine task retrieved successfully'
+        );
     }
+
 
     // Create routine task method
     public function store(Request $request)
     {
         // validation
         $validatedData = $this->validateRoutineTask($request);
+
         $validatedData['user_id'] = Auth::user()->id;
-
-        // return response()->json([
-        //     'message' => 'Validation successful',
-        //     'validated_data' => $validatedData
-        // ], 200);
-
+        // if repeat_days is not null, encode it to json
+        $validatedData['repeat_days'] = $request->repeat_days ? json_encode($validatedData['repeat_days']) : null;
         $routineTask = RoutineTask::create($validatedData);
 
-        return response()->json([
-            'message' => 'Routine task created successfully',
-            'routine_task' => $routineTask
-        ], 201);
+        return $this->success(
+            new RoutineTaskResource($routineTask),
+            'Routine task was created successfully',
+            201
+        );
     }
 
 
@@ -62,13 +70,21 @@ class RoutineTaskController extends Controller
         // validation
         $validatedData = $this->validateRoutineTask($request);
 
+        // deactivate old routine task
         $routineTask = RoutineTask::findOrFail($id);
-        $routineTask->update($validatedData);
+        $routineTask->update(['deactivated_at' => now()]);
 
-        return response()->json([
-            'message' => 'Routine task updated successfully',
-            'routine_task' => $routineTask
-        ], 200);
+        // create new routine task with updated data
+        $validatedData['user_id'] = Auth::user()->id;
+        // if repeat_days is not null, encode it to json
+        $validatedData['repeat_days'] = $request->repeat_days ? json_encode($validatedData['repeat_days']) : null;
+
+        $routineTask = RoutineTask::create($validatedData);
+
+        return $this->success(
+            new RoutineTaskResource($routineTask),
+            'Routine task was updated successfully',
+        );
     }
 
 
@@ -76,22 +92,25 @@ class RoutineTaskController extends Controller
     public function destroy($id)
     {
         $routineTask = RoutineTask::findOrFail($id);
-        $routineTask->delete();
+        // deactivate routine task
+        $routineTask->update(['deactivated_at' => now()]);
 
-        return response()->json([
-            'message' => 'Routine task deleted successfully'
-        ], 200);
+        return $this->success(
+            new RoutineTaskResource($routineTask),
+            'Routine task was deactivated successfully',
+        );
     }
 
 
     // validation for routine task
-    protected function validateRoutineTask(Request $request)
+    private function validateRoutineTask(Request $request)
     {
         return $request->validate([
             'parent_id' => 'nullable|exists:routine_tasks,id',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'day_of_week' => 'required|integer|between:0,6',
+            'repeat_days' => 'required_without:parent_id|array',
+            'repeat_days.*' => 'integer|between:0,6',
             'start_at' => 'required|date_format:H:i',
             'end_at' => 'required|date_format:H:i|after:start_at',
         ]);

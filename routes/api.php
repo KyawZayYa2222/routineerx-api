@@ -16,13 +16,6 @@ Route::prefix('v1')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
 
         // Routine task routes
-        // Route::prefix('/routine-tasks')->controller(RoutineTaskController::class)->group(function () {
-        //     Route::get('/', 'index');
-        //     Route::get('/{id}', 'show');
-        //     Route::post('/', 'create');
-        //     Route::put('/{id}', 'update');
-        //     Route::delete('/{id}', 'destroy');
-        // });
         Route::apiResource('/routine-tasks', RoutineTaskController::class);
     });
 });

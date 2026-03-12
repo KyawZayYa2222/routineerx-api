@@ -1,10 +1,13 @@
 <?php
 
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+// use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -17,12 +20,41 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->render(function(NotFoundHttpException $e, $request) {
-            // Check if the previous exception is a ModelNotFoundException
-            if ($e->getPrevious() instanceof ModelNotFoundException) {
+        // Handle ModelNotFound (404)
+        $exceptions->render(function (ModelNotFoundException $e, $request) {
+            return response()->json([
+                'success' => 'false',
+                'message' => $e->getMessage() ?: 'Resource not found.',
+                'errors' => []
+            ], 404);
+        });
+
+        // Handle Validation Errors (422)
+        $exceptions->render(function (ValidationException $e, $request) {
+            return response()->json([
+                'success' => 'false',
+                'message' => $e->getMessage() ?: 'The given data was invalid.',
+                'errors' => $e->errors()
+            ], $e->status);
+        });
+
+        // Handle Generic HTTP Exceptions (403, 404, 500, etc.)
+        $exceptions->render(function (HttpException $e, $request) {
+            return response()->json([
+                'success' => 'false',
+                'message' => $e->getMessage() ?: 'An error occurred.',
+                'errors' => []
+            ], $e->getStatusCode());
+        });
+
+        // Handle authentication exceptions (401)
+        $exceptions->render(function (AuthenticationException $e, $request) {
+            if ($request->is('api/*')) {
                 return response()->json([
-                    'message' => 'Resource not found'
-                ], 404);
+                    'success' => 'false',
+                    'message' => 'Unauthenticated.',
+                    'errors' => []
+                ], 401);
             }
         });
     })->create();

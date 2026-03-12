@@ -17,9 +17,10 @@ return new class extends Migration
             $table->foreignId('parent_id')->nullable()->constrained('routine_tasks', 'id')->onDelete('cascade');
             $table->string('title');
             $table->text('description')->nullable();
-            $table->integer('day_of_week');
+            $table->json('repeat_days')->nullable();
             $table->time('start_at')->nullable();
             $table->time('end_at')->nullable();
+            $table->timestamp('deactivated_at')->nullable();
             $table->timestamps();
         });
     }
