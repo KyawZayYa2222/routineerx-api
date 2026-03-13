@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\DailyTaskController;
 use App\Http\Controllers\RoutineTaskController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,5 +18,11 @@ Route::prefix('v1')->group(function () {
 
         // Routine task routes
         Route::apiResource('/routine-tasks', RoutineTaskController::class);
+
+        // Daily task routes
+        Route::prefix('daily-tasks')->controller(DailyTaskController::class)->group(function () {
+            Route::post('/{id}/complete', 'completeTask');
+            Route::get('/{id}/is-completed', 'isTaskCompleted');
+        });
     });
 });
